@@ -1,0 +1,360 @@
+adotCollector:
+  image:
+# --- Container image repository URL hosting the aws-otel-collector image and respective tag
+    repository: 812677824406.dkr.ecr.us-gov-west-1.amazonaws.com/aws-otel-collector
+    tag: "v0.35.0"
+    daemonSetPullPolicy: "Always"
+    sidecarPullPolicy: "Always"
+
+
+
+
+# --- Daemonset Kubernetes configuration - If enabled is set to true, an aws-otel-collector daemonset will be created with the below configuration 
+  daemonSet:
+    enabled: true
+    daemonSetName: "adot-collector-daemonset"
+    containersName: "adot-collector-container"
+    annotations: {}
+    # --- Required exposing port 4317 as hostport for otlp receiver
+    exposedPorts:
+      enabled: true
+      ports:
+        - name: "otlp-gprc"
+          containerPort: 4317
+          hostPort: 4317
+          protocol: TCP
+        - name: "otlp-http"
+          containerPort: 4318
+          hostPort: 4318
+          protocol: TCP
+# --- The below ENV variables are required if using the awscontainerinsightreceiver.
+    env:
+    - name: "K8S_NODE_NAME"
+      valueFrom:
+        fieldRef:
+          fieldPath: "spec.nodeName"
+    - name: "HOST_IP"
+      valueFrom:
+        fieldRef:
+          fieldPath: "status.hostIP"
+    - name: "K8S_POD_NAME"
+      valueFrom:
+        fieldRef:
+          fieldPath: "metadata.name"
+    - name: "HOST_NAME"
+      valueFrom:
+        fieldRef:
+          fieldPath: "spec.nodeName"
+    - name: "K8S_NAMESPACE"
+      valueFrom:
+        fieldRef:
+          fieldPath: "metadata.namespace"
+# --- Additional ENV variables can be defined below this line
+    command:
+      - "/awscollector"
+      - "--config=/conf/adot-config.yaml"
+# --- The aws-otel-collector container is built to be ran with the /awscollector executible. 
+#     The executible requires configuration to be passed. By default the configuration is passed via a mounted configmap found at /conf/adot-config.yaml and passed with the '--config' flag
+# --- Root privleges are required if using the awscontainerinsightreceiver to collect metrics from the k8sapiserver and cadvisor
+    securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+# --- Resource limits and requests
+    resources:
+      limits:
+        cpu: "200m"
+        memory: "200Mi"
+      requests:
+        cpu: "200m"
+        memory: "200Mi"
+# --- Tolerations to be applied on pods in this daemonset
+    tolerations: []
+# --- The following volumes are preconfigured to setup the aws-otel-collector with the awscontainerinsightreceiver and awsemf exporter
+    volumes:
+# --- configMap volume with the configuration defined in adot-config.yaml 
+      - configMap:
+          name: "adot-conf"
+          items:
+            - key: "adot-config"
+              path: "adot-config.yaml"
+        name: "adot-config-vol"
+# --- The following root file system volumes required if using the awscontainerinsightreceiver
+      - name: "rootfs"
+        hostPath:
+          path: "/"
+      - name: "dockersock"
+        hostPath:
+          path: "/var/run/docker.sock"
+      - name: "varlibdocker"
+        hostPath:
+          path: "/var/lib/docker"
+      - name: "containerdsock"
+        hostPath:
+          path: "/run/containerd/containerd.sock"
+      - name: "sys"
+        hostPath:
+          path: "/sys"
+      - name: "devdisk"
+        hostPath:
+          path: "/dev/disk/"
+# --- Additional volumes should be configured below this line
+    volumeMounts:
+      - name: "rootfs"
+        mountPath: "/rootfs"
+        readOnly: true
+      - name: "dockersock"
+        mountPath: "/var/run/docker.sock"
+        readOnly: true
+      - name: "varlibdocker"
+        mountPath: "/var/lib/docker"
+        readOnly: true
+      - name: "containerdsock"
+        mountPath: "/run/containerd/containerd.sock"
+        readOnly: true
+      - name: "sys"
+        mountPath: "/sys"
+        readOnly: true
+      - name: "devdisk"
+        mountPath: "/dev/disk"
+        readOnly: true
+      - name: "adot-config-vol"
+        mountPath: "/conf"
+# --- Additional volumeMounts should be configured below this line
+    
+  
+# --- Service Account configuration - If enabled is set to true, a service account with the below configuration will be created, and associated 
+#     with the aws-otel-collector daemonset or sidecar
+  serviceAccount:
+    enabled: true
+    name: "adot-collector-sa"
+    annotations: {}
+
+# --- ClusterRole configuration - If enabled is set to true, a clusterrole with the below configuration will be created. 
+#     The clusterrole has permissions which the awscontainerinsightsreceiver requires to scrape Kubernetes metrics
+  clusterRole: 
+    enabled: true
+    name: "adot-collector-role"
+# --- ClusterRoleBinding configuration - If enabled is set to true, a clusterrolebinding with the below configuration will be created,
+#     it will reference the clusterrole above and associate it with the aws-otel-collector service account, also in the configuration above.
+  clusterRoleBinding: 
+    enabled: true
+    name: "adot-collector-role-binding"
+# --- ConfigMap configuration - If enabled is set to true, a configmap with the below configuration will be created. This configmap has a single file adot-config.yaml. 
+  configMap:
+    enabled: true
+    name: "adot-conf"
+    labels: 
+      app: "opentelemetry"
+      component: "adot-conf"
+# --- The below value is mapped to adot-config.yaml and contains all configuration information required for ADOT
+    adotConfig: 
+# --- Extensions is a list of opentelemetry extensions to be used by the aws-otel-collecotr. The following extensions are configurd by default 
+# --- and the sigv4auth extension is  required if using the awsemf exporter
+      extensions:
+        - health_check: []
+# --- The sigv4auth extension requires the aws region where cloudwatch is located
+        - sigv4auth:
+            region: us-gov-west-1
+# --- Receivers is a list of opentelemetry receivers and their configurations. By default the awscontainerinsightsreceiver has been configured with its default settings
+# --- https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/awscontainerinsightreceiver/README.md
+      receivers:
+        - otlp:
+            protocols:
+              grpc:
+                endpoint: 0.0.0.0:4317
+              http:
+                endpoint: 0.0.0.0:4318
+          awscontainerinsightreceiver:
+            collection_interval: 
+            container_orchestrator: 
+            add_service_as_attribute: 
+            prefer_full_pod_name: 
+            add_full_pod_name_metric_label:
+# --- The following is example prometheus receiver https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/prometheusreceiver 
+        # - prometheus: 
+        #     config:
+        #       global:
+        #         scrape_interval: 15s
+        #         scrape_timeout: 10s
+        #     scrapeConfigs: |
+        #       - job_name: 'k8s_metrics_scrape'
+        #         sample_limit: 10000
+        #         metrics_path: /metrics
+        #         kubernetes_sd_configs:
+        #           - role: pod
+        #         relabel_configs:
+        #           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        #             action: keep
+        #             regex: true
+        #           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        #             action: replace
+        #             regex: (.+)
+        #             target_label: __metrics_path__
+        #           - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        #             action: replace
+        #             regex: ([^:]+)(?::\d+)?;(\d+)
+        #             replacement: $$1:$$2
+        #             target_label: __address__
+        #           - action: labelmap
+        #             regex: __meta_kubernetes_pod_label_(.+)
+        #           - source_labels: [__meta_kubernetes_pod_node_name]
+        #             action: keep
+        #             regex: ${K8S_NODE_NAME}
+        #           - source_labels: [__meta_kubernetes_namespace]
+        #             action: replace
+        #             target_label: K8S_NAMESPACE
+        #           - source_labels: [__meta_kubernetes_pod_name]
+        #             action: replace
+        #             target_label: K8S_POD_NAME
+        #           - source_labels: [__meta_kubernetes_pod_container_name]
+        #             action: replace
+        #             target_label: EKS_Container
+      processors:
+# --- Processors is a list of opentelemetry processors and their configurations. By default the batch processor has been configured. 
+# --- The batch processor batches and compresses spans, metrics, or logs based on size or time, reducing the number os submission requests made by exporters. 
+# --- With the timeout setting, the batch processor is aggregating and sending logs from the receiver to the exporter every 60 seconds 
+        - batch/metrics: 
+            timeout: 60s
+        - batch/traces:
+            timeout: 60s
+        - k8sattributes:
+            pod_association:
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.uid
+                - from: resource_attribute
+                  name: k8s.namespace.name
+            - sources:
+                - from: connection
+# --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
+      exporters:
+        - awsxray:
+          awsemf/1:
+# --- For Container insights to be setup properly for this cluster, the namespace must be set to "ContainerInsights"
+            namespace: "ContainerInsights"
+# --- For AWS to be able to pick up traces/logs/metrics for container insights the log_group_name must be set to the following format
+# --- '/aws/containerinsights/${EKS_CLUSTER_NAME}/performance' where ${EKS_CLUSTER_NAME} is substituted with the name of the EKS cluster running ADOT.
+            log_group_name: '/aws/containerinsights/FPS-EKS-Cluster/performance'
+            log_stream_name: "{NodeName}"
+# --- The awsemf exporter requires the aws region where cloudwatch is located
+            region: us-gov-west-1
+            resource_to_telemetry_conversion:
+              enabled: true
+            dimension_rollup_option: "NoDimensionRollup"
+            parse_json_encoded_attr_values: ["Sources", "kubernetes"]
+# --- The following is a list of EMF formmated metric declarations https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Embedded_Metric_Format_Specification.html
+            metric_declarations: 
+              - dimensions: [[NodeName, InstanceId, ClusterName]]
+                metric_name_selectors:
+                  - node_cpu_utilization
+                  - node_memory_utilization
+                  - node_network_total_bytes
+                  - node_cpu_reserved_capacity
+                  - node_memory_reserved_capacity
+                  - node_number_of_running_pods
+                  - node_number_of_running_containers
+              - dimensions: [[ClusterName]]
+                metric_name_selectors:
+                  - node_cpu_utilization
+                  - node_memory_utilization
+                  - node_network_total_bytes
+                  - node_cpu_reserved_capacity
+                  - node_memory_reserved_capacity
+                  - node_number_of_running_pods
+                  - node_number_of_running_containers
+                  - node_cpu_usage_total
+                  - node_cpu_limit
+                  - node_memory_working_set
+                  - node_memory_limit
+              - dimensions: [[PodName, Namespace, ClusterName], [Service, Namespace, ClusterName], [Namespace, ClusterName], [ClusterName]]
+                metric_name_selectors:
+                  - pod_cpu_utilization
+                  - pod_memory_utilization
+                  - pod_network_rx_bytes
+                  - pod_network_tx_bytes
+                  - pod_cpu_utilization_over_pod_limit
+                  - pod_memory_utilization_over_pod_limit
+              - dimensions: [[PodName, Namespace, ClusterName], [ClusterName]]
+                metric_name_selectors:
+                  - pod_cpu_reserved_capacity
+                  - pod_memory_reserved_capacity
+              - dimensions: [[PodName, Namespace, ClusterName]]
+                metric_name_selectors:
+                  - pod_number_of_container_restarts
+              - dimensions: [[ClusterName]]
+                metric_name_selectors:
+                  - cluster_node_count
+                  - cluster_failed_node_count
+              - dimensions: [[Service, Namespace, ClusterName], [ClusterName]]
+                metric_name_selectors:
+                  - service_number_of_running_pods
+              - dimensions: [[NodeName, InstanceId, ClusterName], [ClusterName]]
+                metric_name_selectors:
+                  - node_filesystem_utilization
+              - dimensions: [[Namespace, ClusterName], [ClusterName]]
+                metric_name_selectors:
+                  - namespace_number_of_running_pods
+          awsemf/2:
+            namespace: "FPS-EKS-Cluster/java"
+            log_group_name: '/aws/containerinsights/FPS-EKS-Cluster/java/metrics'
+            log_stream_name: "{NodeName}"
+            region: us-gov-west-1
+            resource_to_telemetry_conversion:
+              enabled: true
+            dimension_rollup_option: "NoDimensionRollup"
+            metric_declarations:
+              - dimensions: [["PodName"]]
+                metric_name_selectors:
+                - "^.*$"
+              - dimensions: [[PodName], [Max, Min, Count, Sum]]
+                metric_name_selectors:
+                - process.runtime.jvm.gc.duration
+# --- The following is example prometheusremotewrite exporter https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/prometheusremotewriteexporter/README.md
+        # - prometheusremotewrite:
+        #     namespace: ""
+        #     endpoint: ""
+        #     resource_to_telemetry_conversion:
+        #       enabled: false
+        #     auth: 
+        #       authenticator: "sigv4auth"
+# --- The following 
+      service:
+        pipelines: 
+          - metrics/1:
+              receivers: ["awscontainerinsightreceiver"]
+              processors: ["batch/metrics"]
+              exporters: ["awsemf/1"]
+          - metrics/2:
+              receivers: ["otlp"]
+              processors: ["batch/metrics", "k8sattributes"]
+              exporters: ["awsemf/2"]
+          - traces:
+              receivers: [ "otlp"]
+              processors: ["batch/traces"]
+              exporters: ["awsxray"]
+        extensions: ["health_check", "sigv4auth"]
+
+
+  sidecar:
+    enabled: false
+    name: "adot-sidecar"
+    regionS3: ""
+    replicas: 1
+    image:
+      name: ""
+      repository: ""
+      tag: ""
+      pullPolicy: ""
+    resources:
+      limits:
+        cpu: "256m"
+        memory: "512Mi"
+      requests:
+        cpu: "32m"
+        memory: "24Mi"
+
+
+
+
+# -- Additional labels to add into deployed kubernetes components
+additionalLabels: {}
