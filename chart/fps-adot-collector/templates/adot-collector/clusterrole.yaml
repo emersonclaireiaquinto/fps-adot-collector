@@ -8,7 +8,7 @@ metadata:
     {{- include "adotCollector.daemonSet.commonLabels" . | indent 4 }}
 rules:
   - apiGroups: [""]
-    resources: ["pods", "nodes", "endpoints"]
+    resources: ["pods", "nodes", "endpoints", "namespaces"]
     verbs: ["list", "watch"]
   - apiGroups: ["apps"]
     resources: ["replicasets"]
