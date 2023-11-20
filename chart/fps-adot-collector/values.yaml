@@ -310,6 +310,9 @@ adotCollector:
               - dimensions: [[k8s.pod.name, k8s.namespace.name, k8s.pod.uid, k8s.cluster.name]]
                 metric_name_selectors:
                 - "^.*$"
+              - dimensions: [[k8s.pod.name, k8s.namespace.name, k8s.pod.uid, k8s.cluster.name, Min, Max, Count, Sum]]
+                metric_name_selectors:
+                - "^process.runtime.jvm.gc.duration$"
 # --- The following is example prometheusremotewrite exporter https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/prometheusremotewriteexporter/README.md
         # - prometheusremotewrite:
         #     namespace: ""
