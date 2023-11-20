@@ -18,7 +18,7 @@ spec:
         name: {{ .Values.adotCollector.daemonSet.daemonSetName }}
         {{- include "adotCollector.daemonSet.commonLabels" . | indent 8 }}
       annotations:
-        {{toYaml .Values.adotCollector.daemonSet.annotations | nindent 8}}
+        rollme: {{ randAlphaNum 5 | quote}}
     spec:
       containers:
         - name: {{ .Values.adotCollector.daemonSet.containersName }}
