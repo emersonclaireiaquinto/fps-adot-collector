@@ -6,9 +6,6 @@ adotCollector:
     daemonSetPullPolicy: "Always"
     sidecarPullPolicy: "Always"
 
-
-
-
 # --- Daemonset Kubernetes configuration - If enabled is set to true, an aws-otel-collector daemonset will be created with the below configuration 
   daemonSet:
     enabled: true
@@ -29,6 +26,8 @@ adotCollector:
         #   protocol: TCP
 # --- The below ENV variables are required if using the awscontainerinsightreceiver.
     env:
+      - name: "EKS_CLUSTER_NAME"
+        value: "FPS-EKS-Cluster"
       - name: "K8S_NODE_NAME"
         valueFrom:
           fieldRef:
@@ -218,18 +217,19 @@ adotCollector:
         - batch/traces:
             timeout: 60s
         - k8sattributes:
+            passthrough: false
             pod_association:
-            - sources:
-                - from: resource_attribute
-                  name: k8s.pod.uid
-                - from: resource_attribute
-                  name: k8s.namespace.name
-                - from: resource_attribute
-                  name: k8s.pod.name
-                - from: resource_attribute
-                  name: k8s.pod.ip
-            - sources:
-                - from: connection
+              - sources:
+                  - from: resource.attribute
+                    name: k8s.pod.ip
+            extract:
+              metadata:
+                - k8s.pod.name
+                - k8s.pod.uid
+                - k8s.pod.start_time
+                - k8s.deployment.name
+                - k8s.namespace.name
+                - k8s.node.name
 # --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
       exporters:
         - awsxray:
@@ -238,7 +238,7 @@ adotCollector:
             namespace: "ContainerInsights"
 # --- For AWS to be able to pick up traces/logs/metrics for container insights the log_group_name must be set to the following format
 # --- '/aws/containerinsights/${EKS_CLUSTER_NAME}/performance' where ${EKS_CLUSTER_NAME} is substituted with the name of the EKS cluster running ADOT.
-            log_group_name: '/aws/containerinsights/FPS-EKS-Cluster/performance'
+            log_group_name: '/aws/containerinsights/$(EKS_CLUSTER_NAME)/performance'
             log_stream_name: "{NodeName}"
 # --- The awsemf exporter requires the aws region where cloudwatch is located
             region: us-gov-west-1
@@ -299,8 +299,8 @@ adotCollector:
                 metric_name_selectors:
                   - namespace_number_of_running_pods
         - awsemf/2:
-            namespace: "ContainerInsights/Prometheus"
-            log_group_name: '/aws/containerinsights/FPS-EKS-Cluster/prometheus'
+            namespace: "ContainerInsights/Java"
+            log_group_name: /aws/containerinsights/$(EKS_CLUSTER_NAME)/Java
             log_stream_name: "{NodeName}"
             region: us-gov-west-1
             resource_to_telemetry_conversion:
