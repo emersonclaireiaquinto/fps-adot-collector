@@ -238,7 +238,7 @@ adotCollector:
             namespace: "ContainerInsights"
 # --- For AWS to be able to pick up traces/logs/metrics for container insights the log_group_name must be set to the following format
 # --- '/aws/containerinsights/${EKS_CLUSTER_NAME}/performance' where ${EKS_CLUSTER_NAME} is substituted with the name of the EKS cluster running ADOT.
-            log_group_name: '/aws/containerinsights/$(EKS_CLUSTER_NAME)/performance'
+            log_group_name: '/aws/containerinsights/${EKS_CLUSTER_NAME}/performance'
             log_stream_name: "{NodeName}"
 # --- The awsemf exporter requires the aws region where cloudwatch is located
             region: us-gov-west-1
@@ -300,7 +300,7 @@ adotCollector:
                   - namespace_number_of_running_pods
         - awsemf/2:
             namespace: "ContainerInsights/Java"
-            log_group_name: /aws/containerinsights/$(EKS_CLUSTER_NAME)/Java
+            log_group_name: /aws/containerinsights/${EKS_CLUSTER_NAME}/Java
             log_stream_name: "{NodeName}"
             region: us-gov-west-1
             resource_to_telemetry_conversion:
