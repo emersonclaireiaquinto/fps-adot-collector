@@ -1,7 +1,7 @@
 adotCollector:
   image:
 # --- Container image repository URL hosting the aws-otel-collector image and respective tag
-    repository: 812677824406.dkr.ecr.us-gov-west-1.amazonaws.com/aws-otel-collector
+    repository: <IMAGE_REPO>
     tag: "v0.35.0"
     daemonSetPullPolicy: "Always"
     sidecarPullPolicy: "Always"
@@ -224,6 +224,10 @@ adotCollector:
                   name: k8s.pod.uid
                 - from: resource_attribute
                   name: k8s.namespace.name
+                - from: resource_attribute
+                  name: k8s.pod.name
+                - from: resource_attribute
+                  name: k8s.pod.ip
             - sources:
                 - from: connection
 # --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
@@ -294,21 +298,18 @@ adotCollector:
               - dimensions: [[Namespace, ClusterName], [ClusterName]]
                 metric_name_selectors:
                   - namespace_number_of_running_pods
-          awsemf/2:
-            namespace: "FPS-EKS-Cluster/java"
-            log_group_name: '/aws/containerinsights/FPS-EKS-Cluster/java/metrics'
-            log_stream_name: "{NodeName}"
-            region: us-gov-west-1
-            resource_to_telemetry_conversion:
-              enabled: true
-            dimension_rollup_option: "NoDimensionRollup"
-            metric_declarations:
-              - dimensions: [[k8s.pod.name]]
-                metric_name_selectors:
-                - "^.*$"
-              - dimensions: [[k8s.pod.name], [Max, Min, Count, Sum]]
-                metric_name_selectors:
-                - process.runtime.jvm.gc.duration
+        - awsemf/2:
+          namespace: "ContainerInsights/Prometheus"
+          log_group_name: '/aws/containerinsights/FPS-EKS-Cluster/prometheus'
+          log_stream_name: "{NodeName}"
+          region: us-gov-west-1
+          resource_to_telemetry_conversion:
+            enabled: true
+          dimension_rollup_option: "NoDimensionRollup"
+          metric_declarations:
+            - dimensions: [[k8s.pod.name,k8s.namespace.name, k8s.pod.uid]]
+              metric_name_selectors:
+              - "^.*$"
 # --- The following is example prometheusremotewrite exporter https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/prometheusremotewriteexporter/README.md
         # - prometheusremotewrite:
         #     namespace: ""
