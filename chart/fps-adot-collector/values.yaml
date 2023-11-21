@@ -321,7 +321,7 @@ adotCollector:
                 - "^process.runtime.jvm.system.cpu.load_1m$"
                 - "^process.runtime.jvm.classes.unloaded$"
 
-            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool']]
+            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool', 'type']]
               metric_name_selectors:
                 - "^process.runtime.jvm.memory.committed$"
                 - "^process.runtime.jvm.memory.init$"
@@ -335,7 +335,7 @@ adotCollector:
                 - "^process.runtime.jvm.buffer.usage$"
                 - "^process.runtime.jvm.buffer.limit$"
 
-            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'daemontrue']]
+            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'daemon']]
               metric_name_selectors:
                 - "^process.runtime.jvm.threads.count$"
 
