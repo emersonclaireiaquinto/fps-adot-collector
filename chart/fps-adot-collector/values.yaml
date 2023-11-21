@@ -308,11 +308,11 @@ adotCollector:
             dimension_rollup_option: "NoDimensionRollup"
             metric_declarations:
             - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'processorType']]
-              metric_selectors:
+              metric_name_selectors:
                 - "^queueSize$"
 
             - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name']]
-              metric_selectors:
+              metric_name_selectors:
                 - "^process.runtime.jvm.classes.loaded$"
                 - "^process.runtime.jvm.system.cpu.utilization$"
                 - "^process.runtime.jvm.cpu.utilization$"
@@ -322,7 +322,7 @@ adotCollector:
                 - "^process.runtime.jvm.classes.unloaded$"
 
             - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool']]
-              metric_selectors:
+              metric_name_selectors:
                 - "^process.runtime.jvm.memory.committed$"
                 - "^process.runtime.jvm.memory.init$"
                 - "^process.runtime.jvm.memory.usage_after_last_gc$"
@@ -330,13 +330,13 @@ adotCollector:
                 - "^process.runtime.jvm.memory.limit$"
 
             - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool']]
-              metric_selectors:
+              metric_name_selectors:
                 - "^process.runtime.jvm.buffer.count$"
                 - "^process.runtime.jvm.buffer.usage$"
                 - "^process.runtime.jvm.buffer.limit$"
 
             - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'daemontrue']]
-              metric_selectors:
+              metric_name_selectors:
                 - "^process.runtime.jvm.threads.count$"
 
 # --- The following is example prometheusremotewrite exporter https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/prometheusremotewriteexporter/README.md
