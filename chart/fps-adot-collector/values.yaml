@@ -237,6 +237,8 @@ adotCollector:
             telemetry:
               enabled: true
               include_metadata: true
+            aws_log_groups: 
+              - /aws/containerinsights/${EKS_CLUSTER_NAME}/application
           awsemf/1:
 # --- For Container insights to be setup properly for this cluster, the namespace must be set to "ContainerInsights"
             namespace: "ContainerInsights"
