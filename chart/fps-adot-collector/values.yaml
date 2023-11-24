@@ -234,8 +234,9 @@ adotCollector:
       exporters:
         - awsxray:
             index_all_attributes: true
-            telemetry.enabled: true
-            telemetry.include_metadata: true
+            telemetry:
+              enabled: true
+              include_metadata: true
           awsemf/1:
 # --- For Container insights to be setup properly for this cluster, the namespace must be set to "ContainerInsights"
             namespace: "ContainerInsights"
