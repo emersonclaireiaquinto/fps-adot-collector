@@ -233,6 +233,11 @@ adotCollector:
 # --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
       exporters:
         - awsxray:
+            index_all_attributes: true
+            telemetry:
+              enabled: true
+              include_metadata: true
+            aws_log_groups: ["/aws/containerinsights/${EKS_CLUSTER_NAME}/application"]
           awsemf/1:
 # --- For Container insights to be setup properly for this cluster, the namespace must be set to "ContainerInsights"
             namespace: "ContainerInsights"
@@ -360,7 +365,7 @@ adotCollector:
               exporters: ["awsemf/2"]
           - traces:
               receivers: [ "otlp"]
-              processors: ["batch/traces"]
+              processors: ["batch/traces", "k8sattributes"]
               exporters: ["awsxray"]
         extensions: ["health_check", "sigv4auth"]
 
