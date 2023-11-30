@@ -230,6 +230,10 @@ adotCollector:
                 - k8s.deployment.name
                 - k8s.namespace.name
                 - k8s.node.name
+              labels:
+                - tag_name: application
+                  key: app
+                  from: pod
 # --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
       exporters:
         - awsxray:
@@ -312,11 +316,11 @@ adotCollector:
               enabled: true
             dimension_rollup_option: "NoDimensionRollup"
             metric_declarations:
-            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'processorType']]
+            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'processorType']]
               metric_name_selectors:
                 - "^queueSize$"
 
-            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name']]
+            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name']]
               metric_name_selectors:
                 - "^process.runtime.jvm.classes.loaded$"
                 - "^process.runtime.jvm.system.cpu.utilization$"
@@ -326,7 +330,7 @@ adotCollector:
                 - "^process.runtime.jvm.system.cpu.load_1m$"
                 - "^process.runtime.jvm.classes.unloaded$"
 
-            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool', 'type']]
+            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool', 'type']]
               metric_name_selectors:
                 - "^process.runtime.jvm.memory.committed$"
                 - "^process.runtime.jvm.memory.init$"
@@ -334,13 +338,13 @@ adotCollector:
                 - "^process.runtime.jvm.memory.usage$"
                 - "^process.runtime.jvm.memory.limit$"
 
-            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool']]
+            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool']]
               metric_name_selectors:
                 - "^process.runtime.jvm.buffer.count$"
                 - "^process.runtime.jvm.buffer.usage$"
                 - "^process.runtime.jvm.buffer.limit$"
 
-            - dimensions:  [['k8s.pod.name', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'daemon']]
+            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'daemon']]
               metric_name_selectors:
                 - "^process.runtime.jvm.threads.count$"
 
