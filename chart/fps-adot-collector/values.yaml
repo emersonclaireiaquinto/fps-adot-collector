@@ -230,6 +230,10 @@ adotCollector:
                 - k8s.deployment.name
                 - k8s.namespace.name
                 - k8s.node.name
+              labels:
+                - tag_name: application
+                  label_name: app
+                  from: pod
 # --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
       exporters:
         - awsxray:
