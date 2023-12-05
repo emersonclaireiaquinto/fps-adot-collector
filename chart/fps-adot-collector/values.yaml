@@ -120,6 +120,19 @@ adotCollector:
         mountPath: "/conf"
 # --- Additional volumeMounts should be configured below this line
     
+  service:
+    enabled: true
+    name: "adot-collector-service"
+    type: "ClusterIP"
+    ports:
+      - name: "otlp-gprc"
+        port: 4317
+        targetPort: 4317
+        protocol: TCP
+      - name: "otlp-http"
+        port: 4318
+        targetPort: 4318
+        protocol: TCP
   
 # --- Service Account configuration - If enabled is set to true, a service account with the below configuration will be created, and associated 
 #     with the aws-otel-collector daemonset or sidecar
@@ -161,8 +174,8 @@ adotCollector:
             protocols:
               grpc:
                 endpoint: 0.0.0.0:4317
-              # http:
-              #   endpoint: 0.0.0.0:4318
+              http:
+                endpoint: 0.0.0.0:4318
           awscontainerinsightreceiver:
             collection_interval: 
             container_orchestrator: 
@@ -347,6 +360,15 @@ adotCollector:
             - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'daemon']]
               metric_name_selectors:
                 - "^process.runtime.jvm.threads.count$"
+
+            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'http.method', 'http.response_content_length', 'http.status_code', 'http.target', 'net.host.name', 'net.host.port', 'net.protocol.name', 'net.protocol.version', 'net.sock.host.addr', 'net.sock.peer.addr', 'net.sock.peer.port']]
+              metric_name_selectors:
+                - "^http.server.request.duration$"
+            
+            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.pod.uid', 'k8s.cluster.name', 'pool.name', 'db.client.connections.usage', 'state']]
+              metric_name_selectors:
+                - "^db.client.connections$"
+
 
 # --- The following is example prometheusremotewrite exporter https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/prometheusremotewriteexporter/README.md
         # - prometheusremotewrite:
