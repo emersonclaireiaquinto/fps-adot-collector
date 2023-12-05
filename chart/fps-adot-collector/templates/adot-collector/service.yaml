@@ -1,0 +1,13 @@
+{{- if .Values.adotCollector.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.adotCollector.service.name }}
+  labels:
+    {{- include "adotCollector.daemonSet.commonLabels" . | indent 4 }}
+spec:
+    type: {{ .Values.adotCollector.service.type }}
+    ports: {{- toYaml .Values.adotCollector.service.ports | nindent 4 }}
+    selector:
+      {{- include "adotCollector.daemonSet.selectorLabels" . | indent 6 }}
+{{- end -}}

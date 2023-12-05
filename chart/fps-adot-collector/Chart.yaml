@@ -1,13 +1,15 @@
 apiVersion: v2
-name: adot-exporter-for-eks-on-ec2
+name: fps-adot-collector
 description: A Helm chart for collecting metrics using ADOT Collector to send to AWS monitoring services.
 type: application
 version: 0.21.0
 appVersion: "0.35.0"
 kubeVersion: ">=1.19.0-0"
 maintainers:
-  - name: Bryan Aguilar
-    email: bryaag@amazon.com
-home: https://github.com/aws-observability/aws-otel-helm-charts/adot-exporter-for-eks-on-ec2
+  - name: Emerson Iaquinto
+    email: e.iaquinto@afs.com
+  - name: Wajeah Raja
+    email: wajeah.raja@afs.com
+home: https://github.com/emersonclaireiaquinto/fps-adot-collector
 sources:
-  - https://github.com/aws-observability/aws-otel-helm-charts/adot-exporter-for-eks-on-ec2
+  - https://github.com/emersonclaireiaquinto/fps-adot-collector
