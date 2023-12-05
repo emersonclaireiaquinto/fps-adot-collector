@@ -61,11 +61,11 @@ adotCollector:
 # --- Resource limits and requests
     resources:
       limits:
-        cpu: "200m"
-        memory: "200Mi"
+        cpu: "500m"
+        memory: "500Mi"
       requests:
-        cpu: "200m"
-        memory: "200Mi"
+        cpu: "500m"
+        memory: "500Mi"
 # --- Tolerations to be applied on pods in this daemonset
     tolerations: []
 # --- The following volumes are preconfigured to setup the aws-otel-collector with the awscontainerinsightreceiver and awsemf exporter
