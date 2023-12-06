@@ -3,6 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Values.adotCollector.service.name }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "adotCollector.daemonSet.commonLabels" . | indent 4 }}
 spec:
