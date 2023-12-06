@@ -388,9 +388,9 @@ adotCollector:
                 - "^db.client.connections.use_time$"
             - dimensions: [
                   # Across all pods, use for AVG, SUM, P99
-                  ['application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool.name', 'db.client.connections.usage', 'state'],
+                  ['application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool.name', 'state'],
                   # For a specifc pods, troubleshooting
-                  ['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool.name', 'db.client.connections.usage', 'state']
+                  ['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool.name', 'state']
               ]
               metric_name_selectors:
                 - "^db.client.connections.usage$"
