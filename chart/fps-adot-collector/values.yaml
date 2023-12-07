@@ -333,7 +333,10 @@ adotCollector:
               metric_name_selectors:
                 - "^queueSize$"
 
-            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name']]
+            - dimensions:  [
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool']
+              ]
               metric_name_selectors:
                 - "^process.runtime.jvm.classes.loaded$"
                 - "^process.runtime.jvm.system.cpu.utilization$"
@@ -343,7 +346,10 @@ adotCollector:
                 - "^process.runtime.jvm.system.cpu.load_1m$"
                 - "^process.runtime.jvm.classes.unloaded$"
 
-            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool', 'type']]
+            - dimensions:  [
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool', 'type']
+              ]
               metric_name_selectors:
                 - "^process.runtime.jvm.memory.committed$"
                 - "^process.runtime.jvm.memory.init$"
@@ -351,30 +357,42 @@ adotCollector:
                 - "^process.runtime.jvm.memory.usage$"
                 - "^process.runtime.jvm.memory.limit$"
 
-            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool']]
+            - dimensions:  [
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool']
+              ]
               metric_name_selectors:
                 - "^process.runtime.jvm.buffer.count$"
                 - "^process.runtime.jvm.buffer.usage$"
                 - "^process.runtime.jvm.buffer.limit$"
 
-            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'daemon']]
+            - dimensions:  [
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'daemon'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'state'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'daemon', 'state'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'daemon'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'state'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name',  'daemon', 'state'],
+              ]
               metric_name_selectors:
                 - "^process.runtime.jvm.threads.count$"
 
             - dimensions:  [
-                ['application', 'k8s.namespace.name', 'k8s.cluster.name'],
-                ['application', 'k8s.namespace.name', 'k8s.cluster.name', 'http.status_code'],
-                ['application', 'k8s.namespace.name', 'k8s.cluster.name', 'http.method', 'http.status_code', 'http.route'],
-                ['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'http.method', 'http.status_code', 'http.route']
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'http.status_code'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'http.method', 'http.status_code', 'http.route'],
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'http.method', 'http.status_code', 'http.route']
               ]
               metric_name_selectors:
                 - "^http.server.request.duration$"
             
             - dimensions:  [
-                # Across all pods, use for AVG, P99
-                ['application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool.name'],
+                # Across the namespace, for all FPS services together.
+                ['k8s.cluster.name', 'k8s.namespace.name', 'pool.name', 'state'],
+                # Across all pods, for one service, use for AVG, SUM, P99
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool.name'],
                 # For specific pods, troubleshooting
-                ['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool.name']
+                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool.name']
               ]
               metric_name_selectors:
                 - "^db.client.connections$"
@@ -387,10 +405,12 @@ adotCollector:
                 - "^db.client.connections.wait_time$"
                 - "^db.client.connections.use_time$"
             - dimensions: [
-                  # Across all pods, use for AVG, SUM, P99
-                  ['application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool.name', 'state'],
-                  # For a specifc pods, troubleshooting
-                  ['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'pool.name', 'state']
+                  # Across the namespace, for all FPS services together.
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'pool.name', 'state'],
+                  # Across all pods, for one service, use for AVG, SUM, P99
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool.name', 'state'],
+                  # For a specifc pod, troubleshooting
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool.name', 'state']
               ]
               metric_name_selectors:
                 - "^db.client.connections.usage$"
