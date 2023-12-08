@@ -183,6 +183,7 @@ adotCollector:
           statsd:
             endpoint: 0.0.0.0:8125
             aggregation_interval: 60s
+            enable_metric_type: true
           awscontainerinsightreceiver:
             collection_interval: 
             container_orchestrator: 
