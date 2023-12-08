@@ -180,11 +180,9 @@ adotCollector:
                 endpoint: 0.0.0.0:4317
               http:
                 endpoint: 0.0.0.0:4318
-
           statsd:
             endpoint: 0.0.0.0:8125
             aggregation_interval: 60s
-      
           awscontainerinsightreceiver:
             collection_interval: 
             container_orchestrator: 
@@ -468,11 +466,11 @@ adotCollector:
               processors: ["batch/metrics", "k8sattributes"]
               exporters: ["awsemf/2"]
           - metrics/3:
-              recievers: ["statsd"]
+              receivers: ["statsd"]
               processors: ["batch/metrics", "k8sattributes"]
               exporters: ["awsemf/3"]
           - traces:
-              receivers: [ "otlp"]
+              receivers: ["otlp"]
               processors: ["batch/traces", "k8sattributes"]
               exporters: ["awsxray"]
         extensions: ["health_check", "sigv4auth"]
