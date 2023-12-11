@@ -178,7 +178,6 @@ adotCollector:
             protocols:
               grpc:
                 endpoint: 0.0.0.0:4317
-                max_recv_msg_size_mib: 100
               http:
                 endpoint: 0.0.0.0:4318
           statsd:
@@ -238,6 +237,7 @@ adotCollector:
             timeout: 60s
         - batch/traces:
             timeout: 60s
+            send_batch_size: 
         - k8sattributes:
             passthrough: false
             pod_association:
