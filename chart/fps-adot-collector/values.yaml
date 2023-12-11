@@ -243,6 +243,7 @@ adotCollector:
               - sources:
                   - from: resource_attribute
                     name: k8s.pod.ip
+                  - from: connection
             extract:
               metadata:
                 - k8s.pod.name
