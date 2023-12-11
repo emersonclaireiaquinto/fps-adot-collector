@@ -237,7 +237,6 @@ adotCollector:
             timeout: 60s
         - batch/traces:
             timeout: 60s
-            send_batch_size: 
         - k8sattributes:
             passthrough: false
             pod_association:
