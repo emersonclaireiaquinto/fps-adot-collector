@@ -445,7 +445,7 @@ adotCollector:
               exporters: ["awsxray"]
           - traces/kong:
               receivers: ["otlp"]
-              processors: ["batches/traces", "k8sattributes/kong" ]
+              processors: ["batch/traces", "k8sattributes/kong" ]
               exporters: ["awsxray"]
         extensions: ["health_check", "sigv4auth"]
 
