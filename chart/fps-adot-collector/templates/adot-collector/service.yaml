@@ -9,6 +9,12 @@ metadata:
 spec:
     type: {{ .Values.adotCollector.service.type }}
     ports: {{- toYaml .Values.adotCollector.service.ports | nindent 4 }}
+    sessionAffinity: {{ .Values.adotCollector.service.sessionAffinity }}
+    {{ if eq .Values.adotCollector.service.sessionAffinity "ClientIP" -}}
+    sessionAffinityConfig:
+      clientIP:
+        timeoutSeconds: {{ .Values.adotCollector.service.sessionAffinityTimeoutSeconds }}
+    {{ end -}}
     selector:
       {{- include "adotCollector.daemonSet.selectorLabels" . | indent 6 }}
 {{- end -}}

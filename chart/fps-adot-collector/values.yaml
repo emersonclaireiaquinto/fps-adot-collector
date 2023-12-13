@@ -137,6 +137,9 @@ adotCollector:
         port: 8125
         targetPort: 8125
         protocol: UDP
+    sessionAffinity: "ClientIP"
+    sessionAffinityTimeoutSeconds: 10800
+
   
 # --- Service Account configuration - If enabled is set to true, a service account with the below configuration will be created, and associated 
 #     with the aws-otel-collector daemonset or sidecar
@@ -437,7 +440,7 @@ adotCollector:
               exporters: ["awsemf/java"]
           - metrics/kong:
               receivers: ["statsd"]
-              processors: ["batch/metrics", "k8sattributes/kong"]
+              processors: ["k8sattributes/kong"]
               exporters: ["awsemf/kong"]
           - traces/java:
               receivers: ["otlp"]
