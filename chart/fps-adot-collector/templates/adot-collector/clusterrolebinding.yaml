@@ -5,7 +5,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Values.adotCollector.clusterRoleBinding.name }}
   labels:
-    {{- include "adotCollector.daemonSet.commonLabels" . | indent 4 }}
+    {{- include "adotCollector.commonLabels" . | indent 4 }}
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.adotCollector.serviceAccount.name }}

@@ -1,0 +1,47 @@
+{{- if .Values.adotCollector.deployment.enabled }}
+# ADOT Collector as a deployment for deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.adotCollector.deployment.deploymentName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "adotCollector.deployment.commonLabels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.adotCollector.deployment.replicas}}
+  selector:
+    matchLabels:
+      name: {{ .Values.adotCollector.deployment.deploymentName }}
+      {{- include "adotCollector.deployment.selectorLabels" . | indent 6 }}
+  template:
+    metadata:
+      labels:
+        name: {{ .Values.adotCollector.deployment.deploymentName }}
+        {{- include "adotCollector.deployment.commonLabels" . | indent 8 }}
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote}}
+    spec:
+      containers:
+        - name: {{ .Values.adotCollector.deployment.containersName }}
+          image: "{{ .Values.adotCollector.image.repository }}:{{ .Values.adotCollector.image.tag }}"
+          imagePullPolicy: {{ .Values.adotCollector.image.deploymentPullPolicy }}
+          env:
+            {{- toYaml .Values.adotCollector.deployment.env | nindent 12}}
+          command:
+            {{- toYaml .Values.adotCollector.deployment.command | nindent 12}}
+          volumeMounts:
+            {{- toYaml .Values.adotCollector.deployment.volumeMounts | nindent 12 }}
+          securityContext: 
+            {{- toYaml .Values.adotCollector.deployment.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.adotCollector.deployment.resources | nindent 12 }}
+          {{- if .Values.adotCollector.deployment.exposedPorts.enabled }}
+          ports:
+            {{- toYaml .Values.adotCollector.deployment.exposedPorts.ports | nindent 12 }}
+          {{- end }}
+      volumes:
+        {{- toYaml .Values.adotCollector.deployment.volumes | nindent 10 }}
+      serviceAccountName: {{ .Values.adotCollector.serviceAccount.name  }}
+      tolerations:
+        {{- toYaml .Values.adotCollector.deployment.tolerations | nindent 8 }}
+{{- end }}

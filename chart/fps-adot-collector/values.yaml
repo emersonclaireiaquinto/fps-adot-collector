@@ -1,17 +1,19 @@
 adotCollector:
   image:
 # --- Container image repository URL hosting the aws-otel-collector image and respective tag
-    repository: <IMAGE_REPO>
+    repository: "093737011827.dkr.ecr.us-gov-west-1.amazonaws.com/fps-docker/aws-otel-collector"
     tag: "v0.35.0"
     daemonSetPullPolicy: "Always"
+    deploymentPullPolicy: "Always"
     sidecarPullPolicy: "Always"
 
-# --- Daemonset Kubernetes configuration - If enabled is set to true, an aws-otel-collector daemonset will be created with the below configuration 
+# --- Daemonset Kubernetes configuration - If enabled is set to true, an aws-otel-collector daemonSet will be created with the below configuration 
   daemonSet:
     enabled: true
-    daemonSetName: "adot-collector-daemonset"
+    daemonSetName: "adot-collector-daemonSet"
     containersName: "adot-collector-container"
     annotations: {}
+    additionalLabels: {}
     # --- Required exposing port 4317 as hostport for otlp receiver
     exposedPorts:
       enabled: true
@@ -51,7 +53,7 @@ adotCollector:
 # --- Additional ENV variables can be defined below this line
     command:
       - "/awscollector"
-      - "--config=/conf/adot-config.yaml"
+      - "--config=/conf/adot-daemonSet-config.yaml"
 # --- The aws-otel-collector container is built to be ran with the /awscollector executible. 
 #     The executible requires configuration to be passed. By default the configuration is passed via a mounted configmap found at /conf/adot-config.yaml and passed with the '--config' flag
 # --- Root privleges are required if using the awscontainerinsightreceiver to collect metrics from the k8sapiserver and cadvisor
@@ -61,22 +63,512 @@ adotCollector:
 # --- Resource limits and requests
     resources:
       limits:
-        cpu: "2"
-        memory: "4Gi"
+        cpu: "4"
+        memory: "8Gi"
       requests:
-        cpu: "1"
-        memory: "2Gi"
-# --- Tolerations to be applied on pods in this daemonset
+        cpu: "2"
+        memory: "6Gi"
+# --- Tolerations to be applied on pods in this daemonSet
     tolerations: []
 # --- The following volumes are preconfigured to setup the aws-otel-collector with the awscontainerinsightreceiver and awsemf exporter
     volumes:
 # --- configMap volume with the configuration defined in adot-config.yaml 
       - configMap:
-          name: "adot-conf"
+          name: "adot-daemonSet-conf"
           items:
-            - key: "adot-config"
-              path: "adot-config.yaml"
-        name: "adot-config-vol"
+            - key: "adot-daemonSet-config"
+              path: "adot-daemonSet-config.yaml"
+        name: "adot-daemonSet-config-vol"
+# --- The following root file system volumes required if using the awscontainerinsightreceiver
+      - name: "rootfs"
+        hostPath:
+          path: "/"
+      - name: "dockersock"
+        hostPath:
+          path: "/var/run/docker.sock"
+      - name: "varlibdocker"
+        hostPath:
+          path: "/var/lib/docker"
+      - name: "containerdsock"
+        hostPath:
+          path: "/run/containerd/containerd.sock"
+      - name: "sys"
+        hostPath:
+          path: "/sys"
+      - name: "devdisk"
+        hostPath:
+          path: "/dev/disk/"
+# --- Additional volumes should be configured below this line
+    volumeMounts:
+      - name: "rootfs"
+        mountPath: "/rootfs"
+        readOnly: true
+      - name: "dockersock"
+        mountPath: "/var/run/docker.sock"
+        readOnly: true
+      - name: "varlibdocker"
+        mountPath: "/var/lib/docker"
+        readOnly: true
+      - name: "containerdsock"
+        mountPath: "/run/containerd/containerd.sock"
+        readOnly: true
+      - name: "sys"
+        mountPath: "/sys"
+        readOnly: true
+      - name: "devdisk"
+        mountPath: "/dev/disk"
+        readOnly: true
+      - name: "adot-daemonSet-config-vol"
+        mountPath: "/conf"
+    configMap:
+      enabled: true
+      name: "adot-daemonSet-conf"
+      labels: 
+        app: "opentelemetry"
+        component: "adot-daemonSet-conf"
+  # --- The below value is mapped to adot-config.yaml and contains all configuration information required for ADOT
+      adotConfig: 
+  # --- Extensions is a list of opentelemetry extensions to be used by the aws-otel-collecotr. The following extensions are configurd by default 
+  # --- and the sigv4auth extension is  required if using the awsemf exporter
+        extensions:
+          - health_check: []
+  # --- The sigv4auth extension requires the aws region where cloudwatch is located
+          - sigv4auth:
+              region: us-gov-west-1
+  # --- Receivers is a list of opentelemetry receivers and their configurations. By default the awscontainerinsightsreceiver has been configured with its default settings
+  # --- https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/awscontainerinsightreceiver/README.md
+        receivers:
+          - otlp:
+              protocols:
+                grpc:
+                  endpoint: 0.0.0.0:4317
+                http:
+                  endpoint: 0.0.0.0:4318
+            statsd:
+              endpoint: 0.0.0.0:8125
+              aggregation_interval: 60s
+              enable_metric_type: true
+
+            awscontainerinsightreceiver:
+              collection_interval: 
+              container_orchestrator: 
+              add_service_as_attribute: 
+              prefer_full_pod_name: 
+              add_full_pod_name_metric_label:
+
+            prometheus:
+              config:
+                scrape_configs:
+                  - job_name: kong
+                    scrape_interval: 1m
+                    metric_relabel_configs:
+                      - # The source labels select values from existing labels. Their content is concatenated
+                        # using the configured separator and matched against the configured regular expression
+                        # for the replace, keep, and drop actions.
+                        source_labels: [service]
+                        # Label to which the resulting value is written in a replace action.
+                        # It is mandatory for replace actions. Regex capture groups are available.
+                        target_label: application
+                        # Regular expression against which the extracted value is matched.
+                        regex: ^(\w+)\.(\w+)\.(\w+)-svc.8080$
+                        # Replacement value against which a regex replace is performed if the
+                        # regular expression matches. Regex capture groups are available.
+                        replacement: $3
+                        # Action to perform based on regex matching.
+                        action: replace
+
+        processors:
+  # --- Processors is a list of opentelemetry processors and their configurations. By default the batch processor has been configured. 
+  # --- The batch processor batches and compresses spans, metrics, or logs based on size or time, reducing the number os submission requests made by exporters. 
+  # --- With the timeout setting, the batch processor is aggregating and sending logs from the receiver to the exporter every 60 seconds 
+          - batch/metrics: 
+              timeout: 60s
+          - batch/traces:
+              timeout: 60s
+          - k8sattributes/java:
+              passthrough: false
+              pod_association:
+                - sources:
+                  - from: resource_attribute
+                    name: k8s.pod.ip
+              extract:
+                metadata:
+                  - k8s.pod.name
+                  - k8s.pod.uid
+                  - k8s.pod.start_time
+                  - k8s.deployment.name
+                  - k8s.namespace.name
+                  - k8s.node.name
+                labels:
+                  - tag_name: application
+                    key: app
+                    from: pod
+          - k8sattributes/kong:
+              passthrough: false
+              pod_association:
+                - sources:
+                  - from: connection
+              extract:
+                metadata:
+                  - k8s.pod.name
+                  - k8s.pod.uid
+                  - k8s.pod.start_time
+                  - k8s.deployment.name
+                  - k8s.namespace.name
+                  - k8s.node.name
+                labels:
+                  - tag_name: application
+                    key: app
+                    from: pod
+  # --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
+        exporters:
+          - awsxray:
+              index_all_attributes: true
+              telemetry:
+                enabled: true
+                include_metadata: true
+              aws_log_groups: ["/aws/containerinsights/${EKS_CLUSTER_NAME}/application"]
+            awsemf/insights:
+  # --- For Container insights to be setup properly for this cluster, the namespace must be set to "ContainerInsights"
+              namespace: "ContainerInsights"
+  # --- For AWS to be able to pick up traces/logs/metrics for container insights the log_group_name must be set to the following format
+  # --- '/aws/containerinsights/${EKS_CLUSTER_NAME}/performance' where ${EKS_CLUSTER_NAME} is substituted with the name of the EKS cluster running ADOT.
+              log_group_name: '/aws/containerinsights/${EKS_CLUSTER_NAME}/performance'
+              log_stream_name: "{NodeName}"
+  # --- The awsemf exporter requires the aws region where cloudwatch is located
+              region: us-gov-west-1
+              resource_to_telemetry_conversion:
+                enabled: true
+              dimension_rollup_option: "NoDimensionRollup"
+              parse_json_encoded_attr_values: ["Sources", "kubernetes"]
+  # --- The following is a list of EMF formmated metric declarations https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Embedded_Metric_Format_Specification.html
+              metric_declarations: 
+                - dimensions: [[NodeName, InstanceId, ClusterName]]
+                  metric_name_selectors:
+                    - node_cpu_utilization
+                    - node_memory_utilization
+                    - node_network_total_bytes
+                    - node_cpu_reserved_capacity
+                    - node_memory_reserved_capacity
+                    - node_number_of_running_pods
+                    - node_number_of_running_containers
+                - dimensions: [[ClusterName]]
+                  metric_name_selectors:
+                    - node_cpu_utilization
+                    - node_memory_utilization
+                    - node_network_total_bytes
+                    - node_cpu_reserved_capacity
+                    - node_memory_reserved_capacity
+                    - node_number_of_running_pods
+                    - node_number_of_running_containers
+                    - node_cpu_usage_total
+                    - node_cpu_limit
+                    - node_memory_working_set
+                    - node_memory_limit
+                - dimensions: [[PodName, Namespace, ClusterName], [Service, Namespace, ClusterName], [Namespace, ClusterName], [ClusterName]]
+                  metric_name_selectors:
+                    - pod_cpu_utilization
+                    - pod_memory_utilization
+                    - pod_network_rx_bytes
+                    - pod_network_tx_bytes
+                    - pod_cpu_utilization_over_pod_limit
+                    - pod_memory_utilization_over_pod_limit
+                - dimensions: [[PodName, Namespace, ClusterName], [ClusterName]]
+                  metric_name_selectors:
+                    - pod_cpu_reserved_capacity
+                    - pod_memory_reserved_capacity
+                - dimensions: [[PodName, Namespace, ClusterName]]
+                  metric_name_selectors:
+                    - pod_number_of_container_restarts
+                - dimensions: [[ClusterName]]
+                  metric_name_selectors:
+                    - cluster_node_count
+                    - cluster_failed_node_count
+                - dimensions: [[Service, Namespace, ClusterName], [ClusterName]]
+                  metric_name_selectors:
+                    - service_number_of_running_pods
+                - dimensions: [[NodeName, InstanceId, ClusterName], [ClusterName]]
+                  metric_name_selectors:
+                    - node_filesystem_utilization
+                - dimensions: [[Namespace, ClusterName], [ClusterName]]
+                  metric_name_selectors:
+                    - namespace_number_of_running_pods
+          - awsemf/java:
+              namespace: "ContainerInsights/Java"
+              log_group_name: /aws/containerinsights/${EKS_CLUSTER_NAME}/Java
+              log_stream_name: "{NodeName}"
+              region: us-gov-west-1
+              resource_to_telemetry_conversion:
+                enabled: true
+              dimension_rollup_option: "NoDimensionRollup"
+              metric_declarations:
+              - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'processorType']]
+                metric_name_selectors:
+                  - "^queueSize$"
+
+              - dimensions:  [
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name']
+                ]
+                metric_name_selectors:
+                  - "^process.runtime.jvm.classes.loaded$"
+                  - "^process.runtime.jvm.system.cpu.utilization$"
+                  - "^process.runtime.jvm.cpu.utilization$"
+                  - "^process.runtime.jvm.classes.current_loaded$"
+                  - "^process.runtime.jvm.gc.duration$"
+                  - "^process.runtime.jvm.system.cpu.load_1m$"
+                  - "^process.runtime.jvm.classes.unloaded$"
+
+              - dimensions:  [
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool', 'type']
+                ]
+                metric_name_selectors:
+                  - "^process.runtime.jvm.memory.committed$"
+                  - "^process.runtime.jvm.memory.init$"
+                  - "^process.runtime.jvm.memory.usage_after_last_gc$"
+                  - "^process.runtime.jvm.memory.usage$"
+                  - "^process.runtime.jvm.memory.limit$"
+
+              - dimensions:  [
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool']
+                ]
+                metric_name_selectors:
+                  - "^process.runtime.jvm.buffer.count$"
+                  - "^process.runtime.jvm.buffer.usage$"
+                  - "^process.runtime.jvm.buffer.limit$"
+
+              - dimensions:  [
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'daemon'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'state'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'daemon', 'state'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'daemon'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'state'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name',  'daemon', 'state'],
+                ]
+                metric_name_selectors:
+                  - "^process.runtime.jvm.threads.count$"
+
+              - dimensions:  [
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'http.status_code'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'http.method', 'http.status_code', 'http.route'],
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'http.method', 'http.status_code', 'http.route']
+                ]
+                metric_name_selectors:
+                  - "^http.server.request.duration$"
+              
+              - dimensions:  [
+                  # Across the namespace, for all FPS services together.
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'pool.name', 'state'],
+                  # Across all pods, for one service, use for AVG, SUM, P99
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool.name'],
+                  # For specific pods, troubleshooting
+                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool.name']
+                ]
+                metric_name_selectors:
+                  - "^db.client.connections$"
+                  - "^db.client.connections.idle.max$"
+                  - "^db.client.connections.idle.min$"
+                  - "^db.client.connections.max$"
+                  - "^db.client.connections.pending_requests$"
+                  - "^db.client.connections.timeouts$"
+                  - "^db.client.connections.create_time$"
+                  - "^db.client.connections.wait_time$"
+                  - "^db.client.connections.use_time$"
+              - dimensions: [
+                    # Across the namespace, for all FPS services together.
+                    ['k8s.cluster.name', 'k8s.namespace.name', 'pool.name', 'state'],
+                    # Across all pods, for one service, use for AVG, SUM, P99
+                    ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool.name', 'state'],
+                    # For a specifc pod, troubleshooting
+                    ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool.name', 'state']
+                ]
+                metric_name_selectors:
+                  - "^db.client.connections.usage$"
+          - awsemf/kong:
+              namespace: "ContainerInsights/Kong"
+              log_group_name: /aws/containerinsights/${EKS_CLUSTER_NAME}/Kong
+              log_stream_name: "{NodeName}"
+              region: us-gov-west-1
+              resource_to_telemetry_conversion:
+                enabled: true
+              dimension_rollup_option: "NoDimensionRollup"
+              metric_declarations:
+                - dimensions:
+                    - [direction]
+                    - [application, direction]
+                  metric_name_selectors:
+                    # Total bandwidth (ingress/egress) throughput in bytes
+                    - "^kong_bandwidth_bytes$"
+                - dimensions:
+                    - []
+                  metric_name_selectors:
+                    # Unix timestamp of Data Plane's cluster_cert expiry time
+                    - "^kong_data_plane_cluster_cert_expiry_timestamp$"
+                    # Datastore reachable from Kong, 0 is unreachable
+                    - "^kong_datastore_reachable$"
+                    # Errors when collecting license info
+                    - "^kong_enterprise_license_errors$"
+                    # Unix epoch time when the license expires, the timestamp is substracted by ...
+                    - "^kong_enterprise_license_expiration$"
+                    # License features features
+                    - "^kong_enterprise_license_features$"
+                    # Last 32 bytes of the license signature in number
+                    - "^kong_enterprise_license_signature$"
+                - dimensions:
+                    - [application, code, source]
+                  metric_name_selectors:
+                    # HTTP status codes per consumer/service/route in Kong
+                    - "^kong_http_requests_total$"
+                - dimensions:
+                    - [application]
+                  metric_name_selectors:
+                    # Latency added by Kong and enabled plugins for each service/route in Kong
+                    - "^kong_kong_latency_ms$"
+                    # Total latency incurred during requests for each service/route in Kong
+                    - "^kong_request_latency_ms$"
+                    # Latency added by upstream response for each service/route in Kong
+                    - "^kong_upstream_latency_ms$"
+                - dimensions:
+                    - [kong_subsystem, shared_dict]
+                    - [kong_subsystem, shared_dict, node_id]
+                  metric_name_selectors:
+                    # Allocated slabs in bytes in a shared_dict
+                    - "^kong_memory_lua_shared_dict_bytes$"
+                    # Total capacity in bytes of a shared_dict
+                    - "^kong_memory_lua_shared_dict_total_bytes$"
+                - dimensions:
+                    - [kong_subsystem]
+                    - [kong_subsystem, node_id]
+                  metric_name_selectors:
+                    # Allocated bytes in worker Lua VM
+                    - "^kong_memory_workers_lua_vms_bytes$"
+                - dimensions:
+                    - [subsystem, state]
+                    - [subsystem, state, node_id]
+                  metric_name_selectors:
+                    # Number of connections by subsystem
+                    - "^kong_nginx_connections_total$"
+                - dimensions:
+                    - []
+                  metric_name_selectors:
+                    # Number of nginx-lua-prometheus errors
+                    - "^kong_nginx_metric_errors_total$"
+                - dimensions:
+                    - [subsystem]
+                    - [subsystem, node_id]
+                  metric_name_selectors:
+                    # Number of requests total
+                    - "^kong_nginx_requests_total$"
+                - dimensions:
+                    - [state]
+                  metric_name_selectors:
+                    # Number of nginx timers
+                    - "^kong_nginx_timers$"
+                - dimensions:
+                    - [upstream, subsystem, state]
+                  metric_name_selectors:
+                    # Health status of targets of upstream. States = healthchecks_off|hea
+                    - "^kong_upstream_target_health$"
+                  
+        service:
+          pipelines: 
+            - metrics/insights:
+                receivers: ["awscontainerinsightreceiver"]
+                processors: ["batch/metrics"]
+                exporters: ["awsemf/insights"]
+            - metrics/java:
+                receivers: ["otlp"]
+                processors: ["batch/metrics", "k8sattributes/java"]
+                exporters: ["awsemf/java"]
+            - metrics/kong:
+                receivers: ["statsd"]
+                processors: ["batch/metrics", "k8sattributes/kong"]
+                exporters: ["awsemf/kong"]
+            - traces/java:
+                receivers: ["otlp"]
+                processors: ["batch/traces", "k8sattributes/java"]
+                exporters: ["awsxray"]
+            - traces/kong:
+                receivers: ["otlp"]
+                processors: ["batch/traces", "k8sattributes/kong" ]
+                exporters: ["awsxray"]
+          extensions: ["health_check", "sigv4auth"]
+# --- Additional volumeMounts should be configured below this line
+  deployment:
+    enabled: true
+    deploymentName: "adot-collector-deployment"
+    containersName: "adot-collector-container"
+    replicas: 1
+    annotations: {}
+    additionalLabels: {}
+    # --- Required exposing port 4317 as hostport for otlp receiver
+    exposedPorts:
+      enabled: false
+      ports:
+        # - name: "otlp-gprc"
+        #   containerPort: 4317
+        #   hostPort: 4317
+        #   protocol: TCP
+        # - name: "otlp-http"
+        #   containerPort: 4318
+        #   hostPort: 4318
+        #   protocol: TCP
+# --- The below ENV variables are required if using the awscontainerinsightreceiver.
+    env:
+      - name: "EKS_CLUSTER_NAME"
+        value: "NGDC-FPS-EKS-cluster"
+      - name: "K8S_NODE_NAME"
+        valueFrom:
+          fieldRef:
+            fieldPath: "spec.nodeName"
+      - name: "HOST_IP"
+        valueFrom:
+          fieldRef:
+            fieldPath: "status.hostIP"
+      - name: "K8S_POD_NAME"
+        valueFrom:
+          fieldRef:
+            fieldPath: "metadata.name"
+      - name: "HOST_NAME"
+        valueFrom:
+          fieldRef:
+            fieldPath: "spec.nodeName"
+      - name: "K8S_NAMESPACE"
+        valueFrom:
+          fieldRef:
+            fieldPath: "metadata.namespace"
+# --- Additional ENV variables can be defined below this line
+    command:
+      - "/awscollector"
+      - "--config=/conf/adot-deployment-config.yaml"
+# --- The aws-otel-collector container is built to be ran with the /awscollector executible. 
+#     The executible requires configuration to be passed. By default the configuration is passed via a mounted configmap found at /conf/adot-config.yaml and passed with the '--config' flag
+# --- Root privleges are required if using the awscontainerinsightreceiver to collect metrics from the k8sapiserver and cadvisor
+    securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+# --- Resource limits and requests
+    resources:
+      limits:
+        cpu: "4"
+        memory: "8Gi"
+      requests:
+        cpu: "2"
+        memory: "6Gi"
+# --- Tolerations to be applied on pods in this daemonSet
+    tolerations: []
+# --- The following volumes are preconfigured to setup the aws-otel-collector with the awscontainerinsightreceiver and awsemf exporter
+    volumes:
+# --- configMap volume with the configuration defined in adot-config.yaml 
+      - configMap:
+          name: "adot-deployment-conf"
+          items:
+            - key: "adot-deployment-config"
+              path: "adot-demployment-config.yaml"
+        name: "adot-deployment-config-vol"
 # --- The following root file system volumes required if using the awscontainerinsightreceiver
       - name: "rootfs"
         hostPath:
@@ -118,12 +610,152 @@ adotCollector:
         readOnly: true
       - name: "adot-config-vol"
         mountPath: "/conf"
-# --- Additional volumeMounts should be configured below this line
-    
+    configMap:
+      enabled: true
+      name: "adot-deployment-conf"
+      labels: 
+        app: "opentelemetry"
+        component: "adot-deployment-conf"
+  # --- The below value is mapped to adot-config.yaml and contains all configuration information required for ADOT
+      adotConfig: 
+  # --- Extensions is a list of opentelemetry extensions to be used by the aws-otel-collecotr. The following extensions are configurd by default 
+  # --- and the sigv4auth extension is  required if using the awsemf exporter
+        extensions:
+          - health_check: []
+  # --- The sigv4auth extension requires the aws region where cloudwatch is located
+          - sigv4auth:
+              region: us-gov-west-1
+  # --- Receivers is a list of opentelemetry receivers and their configurations. By default the awscontainerinsightsreceiver has been configured with its default settings
+  # --- https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/awscontainerinsightreceiver/README.md
+        receivers:
+          prometheus/kong:
+            config:
+              scrape_configs:
+                - job_name: kong
+                  scrape_interval: 1m
+                  metric_relabel_configs:
+                    - # The source labels select values from existing labels. Their content is concatenated
+                      # using the configured separator and matched against the configured regular expression
+                      # for the replace, keep, and drop actions.
+                      source_labels: [service]
+                      # Label to which the resulting value is written in a replace action.
+                      # It is mandatory for replace actions. Regex capture groups are available.
+                      target_label: application
+                      # Regular expression against which the extracted value is matched.
+                      regex: ^(\w+)\.(\w+)\.(\w+)-svc.8080$
+                      # Replacement value against which a regex replace is performed if the
+                      # regular expression matches. Regex capture groups are available.
+                      replacement: $3
+                      # Action to perform based on regex matching.
+                      action: replace
+        processors:
+  # --- Processors is a list of opentelemetry processors and their configurations. By default the batch processor has been configured. 
+  # --- The batch processor batches and compresses spans, metrics, or logs based on size or time, reducing the number os submission requests made by exporters. 
+  # --- With the timeout setting, the batch processor is aggregating and sending logs from the receiver to the exporter every 60 seconds 
+          - batch/metrics: 
+              timeout: 60s
+  # --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
+        exporters:
+          - awsemf/kong:
+              namespace: "ContainerInsights/Kong"
+              log_group_name: /aws/containerinsights/${EKS_CLUSTER_NAME}/Kong
+              log_stream_name: "{NodeName}"
+              region: us-gov-west-1
+              resource_to_telemetry_conversion:
+                enabled: true
+              dimension_rollup_option: "NoDimensionRollup"
+              metric_declarations:
+                - dimensions:
+                    - [direction]
+                    - [application, direction]
+                  metric_name_selectors:
+                    # Total bandwidth (ingress/egress) throughput in bytes
+                    - "^kong_bandwidth_bytes$"
+                - dimensions:
+                    - []
+                  metric_name_selectors:
+                    # Unix timestamp of Data Plane's cluster_cert expiry time
+                    - "^kong_data_plane_cluster_cert_expiry_timestamp$"
+                    # Datastore reachable from Kong, 0 is unreachable
+                    - "^kong_datastore_reachable$"
+                    # Errors when collecting license info
+                    - "^kong_enterprise_license_errors$"
+                    # Unix epoch time when the license expires, the timestamp is substracted by ...
+                    - "^kong_enterprise_license_expiration$"
+                    # License features features
+                    - "^kong_enterprise_license_features$"
+                    # Last 32 bytes of the license signature in number
+                    - "^kong_enterprise_license_signature$"
+                - dimensions:
+                    - [application, code, source]
+                  metric_name_selectors:
+                    # HTTP status codes per consumer/service/route in Kong
+                    - "^kong_http_requests_total$"
+                - dimensions:
+                    - [application]
+                  metric_name_selectors:
+                    # Latency added by Kong and enabled plugins for each service/route in Kong
+                    - "^kong_kong_latency_ms$"
+                    # Total latency incurred during requests for each service/route in Kong
+                    - "^kong_request_latency_ms$"
+                    # Latency added by upstream response for each service/route in Kong
+                    - "^kong_upstream_latency_ms$"
+                - dimensions:
+                    - [kong_subsystem, shared_dict]
+                    - [kong_subsystem, shared_dict, node_id]
+                  metric_name_selectors:
+                    # Allocated slabs in bytes in a shared_dict
+                    - "^kong_memory_lua_shared_dict_bytes$"
+                    # Total capacity in bytes of a shared_dict
+                    - "^kong_memory_lua_shared_dict_total_bytes$"
+                - dimensions:
+                    - [kong_subsystem]
+                    - [kong_subsystem, node_id]
+                  metric_name_selectors:
+                    # Allocated bytes in worker Lua VM
+                    - "^kong_memory_workers_lua_vms_bytes$"
+                - dimensions:
+                    - [subsystem, state]
+                    - [subsystem, state, node_id]
+                  metric_name_selectors:
+                    # Number of connections by subsystem
+                    - "^kong_nginx_connections_total$"
+                - dimensions:
+                    - []
+                  metric_name_selectors:
+                    # Number of nginx-lua-prometheus errors
+                    - "^kong_nginx_metric_errors_total$"
+                - dimensions:
+                    - [subsystem]
+                    - [subsystem, node_id]
+                  metric_name_selectors:
+                    # Number of requests total
+                    - "^kong_nginx_requests_total$"
+                - dimensions:
+                    - [state]
+                  metric_name_selectors:
+                    # Number of nginx timers
+                    - "^kong_nginx_timers$"
+                - dimensions:
+                    - [upstream, subsystem, state]
+                  metric_name_selectors:
+                    # Health status of targets of upstream. States = healthchecks_off|hea
+                    - "^kong_upstream_target_health$"
+                  
+        service:
+          pipelines: 
+            - metrics/kong:
+                receivers: ["prometheus/kong"]
+                processors: ["batch/metrics"]
+                exporters: ["awsemf/kong"]
+          extensions: ["health_check", "sigv4auth"]
+
+
   service:
     enabled: true
     name: "adot-collector-service"
     type: "ClusterIP"
+    selector: 
     ports:
       - name: "otlp-gprc"
         port: 4317
@@ -140,9 +772,10 @@ adotCollector:
     sessionAffinity: "ClientIP"
     sessionAffinityTimeoutSeconds: 10800
 
+    
   
 # --- Service Account configuration - If enabled is set to true, a service account with the below configuration will be created, and associated 
-#     with the aws-otel-collector daemonset or sidecar
+#     with the aws-otel-collector daemonSet or sidecar
   serviceAccount:
     enabled: true
     name: "adot-collector-sa"
@@ -159,298 +792,6 @@ adotCollector:
     enabled: true
     name: "adot-collector-role-binding"
 # --- ConfigMap configuration - If enabled is set to true, a configmap with the below configuration will be created. This configmap has a single file adot-config.yaml. 
-  configMap:
-    enabled: true
-    name: "adot-conf"
-    labels: 
-      app: "opentelemetry"
-      component: "adot-conf"
-# --- The below value is mapped to adot-config.yaml and contains all configuration information required for ADOT
-    adotConfig: 
-# --- Extensions is a list of opentelemetry extensions to be used by the aws-otel-collecotr. The following extensions are configurd by default 
-# --- and the sigv4auth extension is  required if using the awsemf exporter
-      extensions:
-        - health_check: []
-# --- The sigv4auth extension requires the aws region where cloudwatch is located
-        - sigv4auth:
-            region: us-gov-west-1
-# --- Receivers is a list of opentelemetry receivers and their configurations. By default the awscontainerinsightsreceiver has been configured with its default settings
-# --- https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/awscontainerinsightreceiver/README.md
-      receivers:
-        - otlp:
-            protocols:
-              grpc:
-                endpoint: 0.0.0.0:4317
-              http:
-                endpoint: 0.0.0.0:4318
-          statsd:
-            endpoint: 0.0.0.0:8125
-            aggregation_interval: 60s
-            enable_metric_type: true
-
-          awscontainerinsightreceiver:
-            collection_interval: 
-            container_orchestrator: 
-            add_service_as_attribute: 
-            prefer_full_pod_name: 
-            add_full_pod_name_metric_label:
-
-      processors:
-# --- Processors is a list of opentelemetry processors and their configurations. By default the batch processor has been configured. 
-# --- The batch processor batches and compresses spans, metrics, or logs based on size or time, reducing the number os submission requests made by exporters. 
-# --- With the timeout setting, the batch processor is aggregating and sending logs from the receiver to the exporter every 60 seconds 
-        - batch/metrics: 
-            timeout: 60s
-        - batch/traces:
-            timeout: 60s
-        - k8sattributes/java:
-            passthrough: false
-            pod_association:
-              - sources:
-                - from: resource_attribute
-                  name: k8s.pod.ip
-            extract:
-              metadata:
-                - k8s.pod.name
-                - k8s.pod.uid
-                - k8s.pod.start_time
-                - k8s.deployment.name
-                - k8s.namespace.name
-                - k8s.node.name
-              labels:
-                - tag_name: application
-                  key: app
-                  from: pod
-        - k8sattributes/kong:
-            passthrough: false
-            pod_association:
-              - sources:
-                - from: connection
-            extract:
-              metadata:
-                - k8s.pod.name
-                - k8s.pod.uid
-                - k8s.pod.start_time
-                - k8s.deployment.name
-                - k8s.namespace.name
-                - k8s.node.name
-              labels:
-                - tag_name: application
-                  key: app
-                  from: pod
-# --- Exporters is a list of opentelemetry exporters and their configurations. By default the awsemf exporter has been configured to send metrics to AWS Container Insights
-      exporters:
-        - awsxray:
-            index_all_attributes: true
-            telemetry:
-              enabled: true
-              include_metadata: true
-            aws_log_groups: ["/aws/containerinsights/${EKS_CLUSTER_NAME}/application"]
-          awsemf/insights:
-# --- For Container insights to be setup properly for this cluster, the namespace must be set to "ContainerInsights"
-            namespace: "ContainerInsights"
-# --- For AWS to be able to pick up traces/logs/metrics for container insights the log_group_name must be set to the following format
-# --- '/aws/containerinsights/${EKS_CLUSTER_NAME}/performance' where ${EKS_CLUSTER_NAME} is substituted with the name of the EKS cluster running ADOT.
-            log_group_name: '/aws/containerinsights/${EKS_CLUSTER_NAME}/performance'
-            log_stream_name: "{NodeName}"
-# --- The awsemf exporter requires the aws region where cloudwatch is located
-            region: us-gov-west-1
-            resource_to_telemetry_conversion:
-              enabled: true
-            dimension_rollup_option: "NoDimensionRollup"
-            parse_json_encoded_attr_values: ["Sources", "kubernetes"]
-# --- The following is a list of EMF formmated metric declarations https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Embedded_Metric_Format_Specification.html
-            metric_declarations: 
-              - dimensions: [[NodeName, InstanceId, ClusterName]]
-                metric_name_selectors:
-                  - node_cpu_utilization
-                  - node_memory_utilization
-                  - node_network_total_bytes
-                  - node_cpu_reserved_capacity
-                  - node_memory_reserved_capacity
-                  - node_number_of_running_pods
-                  - node_number_of_running_containers
-              - dimensions: [[ClusterName]]
-                metric_name_selectors:
-                  - node_cpu_utilization
-                  - node_memory_utilization
-                  - node_network_total_bytes
-                  - node_cpu_reserved_capacity
-                  - node_memory_reserved_capacity
-                  - node_number_of_running_pods
-                  - node_number_of_running_containers
-                  - node_cpu_usage_total
-                  - node_cpu_limit
-                  - node_memory_working_set
-                  - node_memory_limit
-              - dimensions: [[PodName, Namespace, ClusterName], [Service, Namespace, ClusterName], [Namespace, ClusterName], [ClusterName]]
-                metric_name_selectors:
-                  - pod_cpu_utilization
-                  - pod_memory_utilization
-                  - pod_network_rx_bytes
-                  - pod_network_tx_bytes
-                  - pod_cpu_utilization_over_pod_limit
-                  - pod_memory_utilization_over_pod_limit
-              - dimensions: [[PodName, Namespace, ClusterName], [ClusterName]]
-                metric_name_selectors:
-                  - pod_cpu_reserved_capacity
-                  - pod_memory_reserved_capacity
-              - dimensions: [[PodName, Namespace, ClusterName]]
-                metric_name_selectors:
-                  - pod_number_of_container_restarts
-              - dimensions: [[ClusterName]]
-                metric_name_selectors:
-                  - cluster_node_count
-                  - cluster_failed_node_count
-              - dimensions: [[Service, Namespace, ClusterName], [ClusterName]]
-                metric_name_selectors:
-                  - service_number_of_running_pods
-              - dimensions: [[NodeName, InstanceId, ClusterName], [ClusterName]]
-                metric_name_selectors:
-                  - node_filesystem_utilization
-              - dimensions: [[Namespace, ClusterName], [ClusterName]]
-                metric_name_selectors:
-                  - namespace_number_of_running_pods
-        - awsemf/java:
-            namespace: "ContainerInsights/Java"
-            log_group_name: /aws/containerinsights/${EKS_CLUSTER_NAME}/Java
-            log_stream_name: "{NodeName}"
-            region: us-gov-west-1
-            resource_to_telemetry_conversion:
-              enabled: true
-            dimension_rollup_option: "NoDimensionRollup"
-            metric_declarations:
-            - dimensions:  [['k8s.pod.name', 'application', 'k8s.namespace.name', 'k8s.cluster.name', 'processorType']]
-              metric_name_selectors:
-                - "^queueSize$"
-
-            - dimensions:  [
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name']
-              ]
-              metric_name_selectors:
-                - "^process.runtime.jvm.classes.loaded$"
-                - "^process.runtime.jvm.system.cpu.utilization$"
-                - "^process.runtime.jvm.cpu.utilization$"
-                - "^process.runtime.jvm.classes.current_loaded$"
-                - "^process.runtime.jvm.gc.duration$"
-                - "^process.runtime.jvm.system.cpu.load_1m$"
-                - "^process.runtime.jvm.classes.unloaded$"
-
-            - dimensions:  [
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool', 'type']
-              ]
-              metric_name_selectors:
-                - "^process.runtime.jvm.memory.committed$"
-                - "^process.runtime.jvm.memory.init$"
-                - "^process.runtime.jvm.memory.usage_after_last_gc$"
-                - "^process.runtime.jvm.memory.usage$"
-                - "^process.runtime.jvm.memory.limit$"
-
-            - dimensions:  [
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool']
-              ]
-              metric_name_selectors:
-                - "^process.runtime.jvm.buffer.count$"
-                - "^process.runtime.jvm.buffer.usage$"
-                - "^process.runtime.jvm.buffer.limit$"
-
-            - dimensions:  [
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'daemon'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'state'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'daemon', 'state'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'daemon'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'state'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name',  'daemon', 'state'],
-              ]
-              metric_name_selectors:
-                - "^process.runtime.jvm.threads.count$"
-
-            - dimensions:  [
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'http.status_code'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'http.method', 'http.status_code', 'http.route'],
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'http.method', 'http.status_code', 'http.route']
-              ]
-              metric_name_selectors:
-                - "^http.server.request.duration$"
-            
-            - dimensions:  [
-                # Across the namespace, for all FPS services together.
-                ['k8s.cluster.name', 'k8s.namespace.name', 'pool.name', 'state'],
-                # Across all pods, for one service, use for AVG, SUM, P99
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool.name'],
-                # For specific pods, troubleshooting
-                ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool.name']
-              ]
-              metric_name_selectors:
-                - "^db.client.connections$"
-                - "^db.client.connections.idle.max$"
-                - "^db.client.connections.idle.min$"
-                - "^db.client.connections.max$"
-                - "^db.client.connections.pending_requests$"
-                - "^db.client.connections.timeouts$"
-                - "^db.client.connections.create_time$"
-                - "^db.client.connections.wait_time$"
-                - "^db.client.connections.use_time$"
-            - dimensions: [
-                  # Across the namespace, for all FPS services together.
-                  ['k8s.cluster.name', 'k8s.namespace.name', 'pool.name', 'state'],
-                  # Across all pods, for one service, use for AVG, SUM, P99
-                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'pool.name', 'state'],
-                  # For a specifc pod, troubleshooting
-                  ['k8s.cluster.name', 'k8s.namespace.name', 'application', 'k8s.pod.name', 'pool.name', 'state']
-              ]
-              metric_name_selectors:
-                - "^db.client.connections.usage$"
-        - awsemf/kong:
-            namespace: "ContainerInsights/Kong"
-            log_group_name: /aws/containerinsights/${EKS_CLUSTER_NAME}/Kong
-            log_stream_name: "{NodeName}"
-            region: us-gov-west-1
-            resource_to_telemetry_conversion:
-              enabled: true
-            dimension_rollup_option: "NoDimensionRollup"
-            metric_declarations:
-            - dimensions: [[]]
-              metric_name_selectors:
-                - "^kong.service.*.latency$"
-                
-
-# --- The following is example prometheusremotewrite exporter https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/prometheusremotewriteexporter/README.md
-        # - prometheusremotewrite:
-        #     namespace: ""
-        #     endpoint: ""
-        #     resource_to_telemetry_conversion:
-        #       enabled: false
-        #     auth: 
-        #       authenticator: "sigv4auth"
-# --- The following 
-      service:
-        pipelines: 
-          - metrics/insights:
-              receivers: ["awscontainerinsightreceiver"]
-              processors: ["batch/metrics"]
-              exporters: ["awsemf/insights"]
-          - metrics/java:
-              receivers: ["otlp"]
-              processors: ["batch/metrics", "k8sattributes/java"]
-              exporters: ["awsemf/java"]
-          - metrics/kong:
-              receivers: ["statsd"]
-              processors: ["k8sattributes/kong"]
-              exporters: ["awsemf/kong"]
-          - traces/java:
-              receivers: ["otlp"]
-              processors: ["batch/traces", "k8sattributes/java"]
-              exporters: ["awsxray"]
-          - traces/kong:
-              receivers: ["otlp"]
-              processors: ["batch/traces", "k8sattributes/kong" ]
-              exporters: ["awsxray"]
-        extensions: ["health_check", "sigv4auth"]
 
 
   sidecar:

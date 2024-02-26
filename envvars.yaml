@@ -1,0 +1,30 @@
+- env:
+  - name: POD_IP
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: status.podIP
+  - name: HOST_IP
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: status.hostIP
+  - name: SERVICE_NAME
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.labels['app']
+  - name: EKS_CLUSTER_NAME
+    value: <EKS Cluster Name> 
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: http://$(HOST_IP):4317
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: service.namespace=AWSObservability,service.name=$(SERVICE_NAME),k8s.cluster.name=$(EKS_CLUSTER_NAME),k8s.pod.ip=$(POD_IP), cloud.platform=aws_eks
+  - name: OTEL_TRACES_SAMPLER
+    value: parentbased_traceidratio
+  - name: OTEL_TRACES_SAMPLER_ARG
+    value: "1"                          
+  - name: OTEL_PROPAGATORS
+    value: xray
+
+

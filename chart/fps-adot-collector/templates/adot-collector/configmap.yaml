@@ -1,15 +1,43 @@
-{{- if .Values.adotCollector.configMap.enabled }}
+{{- if .Values.adotCollector.daemonSet.configMap.enabled }}
 # ConfigMap for ADOT Collector as a DaemonSet with the specified configurations, including configured values from values.yaml.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Values.adotCollector.configMap.name }}
+  name: {{ .Values.adotCollector.daemonSet.configMap.name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- toYaml .Values.adotCollector.configMap.labels | nindent 4}}
+    {{- toYaml .Values.adotCollector.daemonSet.configMap.labels | nindent 4}}
     {{- include "adotCollector.daemonSet.commonLabels" . | nindent 4 }}
 data:
-  {{- with  .Values.adotCollector.configMap.adotConfig }}
+  {{- with  .Values.adotCollector.daemonSet.configMap.adotConfig }}
+  adot-config:  |
+    extensions: {{- range $extension := .extensions}} {{ toYaml $extension | nindent 6}} {{- end}}
+    receivers: {{- range $receiver := .receivers}} {{ toYaml $receiver | nindent 6}} {{- end}}
+    processors: {{- range $processor := .processors}} {{ toYaml $processor | nindent 6}} {{- end}}
+    exporters: {{- range $exporter := .exporters}} {{ toYaml $exporter | nindent 6}} {{- end}}
+        
+    service:
+      pipelines:
+        {{- range $pipeline := .service.pipelines}} {{toYaml $pipeline | nindent 8}} {{- end }}
+      extensions: {{- range .service.extensions }}
+      - {{.}} {{- end }}
+
+  {{- end}}
+{{- end }}
+
+---
+
+{{- if .Values.adotCollector.deployment.configMap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.adotCollector.deployment.configMap.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- toYaml .Values.adotCollector.deployment.configMap.labels | nindent 4}}
+    {{- include "adotCollector.deployment.commonLabels" . | nindent 4 }}
+data:
+  {{- with  .Values.adotCollector.deployment.configMap.adotConfig }}
   adot-config:  |
     extensions: {{- range $extension := .extensions}} {{ toYaml $extension | nindent 6}} {{- end}}
     receivers: {{- range $receiver := .receivers}} {{ toYaml $receiver | nindent 6}} {{- end}}
